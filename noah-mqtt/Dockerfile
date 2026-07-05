@@ -1,29 +1,34 @@
-# Alpine image to build
-FROM alpine:latest AS builder
+# ---------- Builder ----------
+FROM golang:1.24-alpine AS builder
 
-# Install Go for building
-RUN apk add --no-cache go git
+WORKDIR /build
 
-# Set working directory to /app
-WORKDIR /app
+RUN apk add --no-cache git
 
-# Install dependencies
-COPY go.mod go.sum ./
+COPY . .
+
 RUN go mod download
 
-# Build the application
-COPY . .
-RUN go build -o noah-mqtt cmd/noah-mqtt/main.go
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=arm64 \
+    go build \
+    -ldflags="-s -w" \
+    -o /out/noah-mqtt \
+    ./cmd/noah-mqtt
 
-# scratch image to run
-FROM scratch
+# ---------- Home Assistant ----------
+FROM ghcr.io/home-assistant/base:latest
 
-# Copy built binaries
-COPY --from=builder /app/noah-mqtt /noah-mqtt
-COPY LICENSE /
-COPY passwd /etc/passwd
-COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
+LABEL io.hass.type="app"
 
-# Set permissions and entry point
-USER gouser
-ENTRYPOINT ["/noah-mqtt"]
+COPY config.json /
+
+RUN apk add --no-cache jq curl
+
+COPY --from=builder /out/noah-mqtt /noah-mqtt
+
+COPY rootfs/docker-entrypoint.sh /
+
+RUN chmod +x /noah-mqtt \
+ && chmod +x /docker-entrypoint.sh
+
+ENTRYPOINT ["/docker-entrypoint.sh"]
