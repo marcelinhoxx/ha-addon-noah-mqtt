@@ -10,10 +10,9 @@
     "mqtt:need"
   ],
   "arch": [
-    "aarch64",
-    "amd64",
-    "armv7"
-  ],
+  "aarch64",
+  "amd64"
+],
   "options": {
     "log_level": "INFO",
     "polling_interval": 10,
